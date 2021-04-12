@@ -54,13 +54,13 @@ model {
           for(i4 in 1:N_month)
               cases[i1, i2, i3, i4]~ binomial_logit(exposures[i1, i2, i3, i4],  rate[i1, i2, i3, i4] );
    for(i in 2:N_age)
-      target+= -0.5*(  age_eff[i]-age_eff[i-1])^2/sigma_age;
+      target+= -0.5*(  age_eff[i]-age_eff[i-1])^2/sigma_age^2;
    age_eff[1]~normal(-8,4);
    for(i in 2:N_age)
-      target+= -0.5*(covid_eff[i]-covid_eff[i-1])^2/sigma_age2; 
+      target+= -0.5*(covid_eff[i]-covid_eff[i-1])^2/sigma_age2^2; 
    for(i in 2:11)
-      target+= -0.5*(month_eff[i]-month_eff[i-1])^2/sigma_month;
-   target+= -(0-month_eff[11])^2/sigma_month;   
+      target+= -0.5*(month_eff[i]-month_eff[i-1])^2/sigma_month^2;
+   target+= -(0-month_eff[11])^2/sigma_month^2;   
    edu_eff~std_normal();
    gender_eff~std_normal();
    covid_eff~std_normal();
