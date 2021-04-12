@@ -55,7 +55,7 @@ model {
               cases[i1, i2, i3, i4]~ binomial_logit(exposures[i1, i2, i3, i4],  rate[i1, i2, i3, i4] );
    for(i in 2:N_age)
       target+= -0.5*(  age_eff[i]-age_eff[i-1])^2/sigma_age^2;
-   age_eff[1]~normal(-8,4);
+   age_eff[1]~normal(-8,4); //why -8? Beause the average monthly mortality is roughly 5e-4, which is -8 in log odds.   
    for(i in 2:N_age)
       target+= -0.5*(covid_eff[i]-covid_eff[i-1])^2/sigma_age2^2; 
    for(i in 2:11)
@@ -64,10 +64,10 @@ model {
    edu_eff~std_normal();
    gender_eff~std_normal();
    covid_eff~std_normal();
-   sigma_month~normal(0,1);
+   sigma_month~std_normal();
    sigma_age~std_normal();
-   sigma_age2~normal(0,1);
-   covid_edu~normal(0,1);
-   covid_male~normal(0,1);
+   sigma_age2~std_normal();
+   covid_edu~std_normal();
+   covid_male~std_normal();
 }
 
