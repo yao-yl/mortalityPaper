@@ -618,3 +618,298 @@ mtext(2, line=1.5, text="count" ,cex=0.7)
 box(lwd=0.5, bty='l')
 
 dev.off()
+
+
+
+
+## poststratification ######
+age_pop=c()
+covid_start_i_list=c(2:8)
+for(i in 1:9)
+	age_pop[i]=mean((age_capped>=age_vec[i] & age_capped<age_vec[i+1]))
+sim_exce_agg_list=list()
+sim_exce_list=sim_base_list=list()
+
+for(covid_start_id in 1:length(covid_start_i_list))	{
+	
+	m2=stan(file="mortality.stan", data=list(N_age=dim(exposure_trim)[1], N_month=dim(exposure_trim)[4],  cases=case_count_trim, exposures=exposure_trim, covid_start=covid_start_i_list[covid_start_id]), chains = 3, iter = 3000)
+	sss=extract(m2)  
+	
+	
+	
+	sss$age_eff=sss$age_eff+mean(sss$month_eff)
+	
+	
+	post_prob= c(mean(male==1 & edu_family==1),  mean(male==0 & edu_family==1),  mean(male==1 & edu_family==0),  mean(male==0 & edu_family==0))
+	
+	invlogit=function (x) 
+	{
+		temp=exp(x)
+		temp/(1+ temp)
+	}
+	
+	sim_exce=sim_base=sim_exce_log=sss$age_eff
+	for(i in 1:ncol(sim_exce)){
+		sim_base[,i]=	cbind(invlogit(sss$age_eff[,i]+  sss$gender_eff +sss$edu_eff),
+												invlogit(sss$age_eff[,i]+  sss$edu_eff),
+												invlogit(sss$age_eff[,i]+ sss$gender_eff),
+												invlogit(sss$age_eff[,i])) %*% post_prob
+		sim_exce[,i]=
+			cbind(invlogit(sss$age_eff[,i]+  sss$covid_eff[,i]+  sss$gender_eff +sss$edu_eff +sss$covid_male+ sss$covid_edu)-
+							invlogit(sss$age_eff[,i]+  sss$gender_eff +sss$edu_eff),
+						
+						invlogit(sss$age_eff[,i]+   sss$covid_eff[,i] + sss$edu_eff+ sss$covid_edu)- 
+							invlogit(sss$age_eff[,i]+  sss$edu_eff),
+						invlogit(sss$age_eff[,i]+  sss$covid_eff[,i]+  sss$gender_eff + sss$covid_male)- 
+							invlogit(sss$age_eff[,i]+ sss$gender_eff),
+						invlogit(sss$age_eff[,i]+  sss$covid_eff[,i])- 
+							invlogit(sss$age_eff[,i])) %*% post_prob
+		
+		
+		
+	}
+	
+	
+	
+	
+	
+	
+	
+	sim_exce_agg=rep(0,nrow(sim_exce))
+	for(i in 1:ncol(sim_exce)){
+		post_prob= c(mean(male==1 & edu_family==1	&	age_capped>=age_vec[i] & age_capped<age_vec[i+1] ),  mean(male==0 & edu_family==1&	age_capped>=age_vec[i] & age_capped<age_vec[i+1]),  mean(male==1 & edu_family==0&	age_capped>=age_vec[i] & age_capped<age_vec[i+1]),  mean(male==0 & edu_family==0&	age_capped>=age_vec[i] & age_capped<age_vec[i+1]))
+		sim_exce_agg=sim_exce_agg+ 	cbind(invlogit(sss$age_eff[,i]+  sss$covid_eff[,i]+  sss$gender_eff +sss$edu_eff +sss$covid_male+ sss$covid_edu)-
+																				invlogit(sss$age_eff[,i]+  sss$gender_eff +sss$edu_eff),
+																			invlogit(sss$age_eff[,i]+   sss$covid_eff[,i] + sss$edu_eff+ sss$covid_edu)- 
+																				invlogit(sss$age_eff[,i]+  sss$edu_eff),
+																			invlogit(sss$age_eff[,i]+  sss$covid_eff[,i]+  sss$gender_eff + sss$covid_male)- 
+																				invlogit(sss$age_eff[,i]+ sss$gender_eff),
+																			invlogit(sss$age_eff[,i]+  sss$covid_eff[,i])- 
+																				invlogit(sss$age_eff[,i])) %*% post_prob
+	}
+	
+	
+	sim_exce_agg_list[[covid_start_id]]=sim_exce_agg
+	sim_exce_list[[covid_start_id]]=sim_exce
+	sim_base_list[[covid_start_id]]=sim_base
+}	
+length(sim_exce_agg_list)
+
+c("Feb 20","May 20","Aug 20")
+k=1
+pdf("~/desktop/excess_prob_dynamic.pdf", width = 6.5, height=1.5)
+#layout(matrix(c(1:7),nrow=1), width = c(1.2,0.25,0.4),height = c(1))
+par(mfrow=c(1,3),oma=c(0.8,1.5,1,0), pty='m',mar=c(1,1.5,0.5,1) ,mgp=c(1.5,0.25,0), lwd=0.5,tck=-0.01, cex.axis=0.7, cex.lab=0.6, cex.main=0.7) 
+for(i in  c(1,4,7)){
+	sim_exce=	sim_exce_list[[i]]
+	if(i>=4)
+		draw_base_rate(sim_exce*1000, yl=c(-1.5,1.5), print_label=TRUE)
+	else
+		draw_base_rate(sim_exce*1000, yl=c(-1.5,1.5), print_label=TRUE)
+	abline(h=c(-.5,-1,1,.5), col='gray40', lty=2)
+	abline(v=seq(10,70, by=10), col='gray60', lty=2, lwd=0.4)
+	abline(h=c(0), col=1, lty=2)
+	if(i==1)
+		mtext(3,text= paste("excess monthly  mortality, \n begin month =", c("Feb 20","May 20","Aug 20")[k]), cex=0.7,line=-0.5)
+	else
+		mtext(3,text=paste("excess monthly  mortality, \n begin month =", c("Feb 20","May 20","Aug 20")[k]), cex=0.7,line=0.5)
+	k=k+1
+	
+	if(i==1|i==5)
+		mtext(2, text=expression(10^{-3}), cex=0.7,las=2, line=1.2)
+}
+dev.off()
+
+
+plot(c(0,0),type='n', axes=F,ylab="",xlab="",xaxs='i', xpd=T, 
+		 xlim=c(0.8, 1.2), ylim=c(-10,10))
+abline(h=c(-5,0,5), col='gray40', lty=2)
+draw_coef=function(x,v){
+	points(x=x, y=  mean(v), pch=18, col="#8F2727", cex=1.5)
+	lines(x=c(x,x), y= as.vector(   quantile(v, c(0.975, 0.025) )), lwd=1, col="#B97C7C", xpd=T)
+	lines(x=c(x,x), y= as.vector( quantile(v, c(0.75, 0.25) )), lwd=3, col="#8F2727" )
+}
+draw_coef(x=1, v=sim_exce[,9]*1000)
+axis(2, las=2, at=c(-5,-10,0,5,10),lwd=0.5)
+mtext(2, text=expression(10^{-3}), cex=0.7,las=2, line=1)
+abline(h=c(-2.5,-7.5), col='gray60', lty=2, lwd=0.5)
+axis(1, at=c(1), labels = "80+", padj=-0.8,lwd=0.5)
+box(lwd=0.5,bty='l')
+
+
+
+
+
+pdf("~/desktop/excess_prob_dynamic_aggregrate3.pdf", width =6.5, height=1.8)
+par(mfrow=c(1,4),oma=c(1,1,1,0), pty='m',mar=c(1,1.5,1,1) ,mgp=c(1.5,0.25,0), lwd=0.5,tck=-0.01, cex.axis=0.7, cex.lab=0.6, cex.main=0.7) 
+plot(c(0,0),type='n', axes=F,ylab="",xlab="",xaxs='i', xpd=T, 
+		 xlim=c(0.8, 7.2), ylim=c(-0.6,1.1))
+abline(h=c(0), col='gray40', lty=1)
+draw_coef=function(x,v){
+	points(x=x, y=  mean(v), pch=18, col="#8F2727", cex=1.3)
+	lines(x=c(x,x), y= as.vector(   quantile(v, c(0.975, 0.025) )), lwd=1, col="#B97C7C", xpd=T)
+	lines(x=c(x,x), y= as.vector( quantile(v, c(0.75, 0.25) )), lwd=3, col="#8F2727" )
+}
+#abline(h=c(-0.1,0.1, -0.05,-0.15, 0.05), col='gray60', lty=2, lwd=0.5)
+abline(h=c(-.3,.6,.9,.3 ), col='gray60', lty=2, lwd=0.5)
+for(i in 1:length(sim_exce_list)){
+	sim_exce_agg=	sim_exce_agg_list[[i]]
+	draw_coef(x=i, v=sim_exce_agg*1000)
+}
+axis(2, las=2, at=c(-.3,0,.6,.9,.3 ),lwd=0.5)
+mtext(2, text=expression(10^{-3}), cex=0.7,las=2, line=0.5,  padj = -5)
+axis(1, at=1:7, labels = 2:8, padj=-0.8,lwd=0.5, cex=0.7)
+mtext(1, text="begin month", cex=0.7,las=1, line=1)
+mtext(3, text="aggregrated excess mortality  \n all ages", cex=0.7,las=1, line=0)
+box(lwd=0.5,bty='l')
+
+plot(c(0,0),type='n', axes=F,ylab="",xlab="",xaxs='i', xpd=T, 
+		 xlim=c(0.8, 7.2), ylim=c(-0.6,1.1))
+abline(h=c(0), col='gray40', lty=1)
+abline(h=c(-.3,.6,.9,.3 ), col='gray60', lty=2, lwd=0.5)
+for(i in 1:length(sim_exce_list)){
+	sim_exce=sim_exce_list[[i]]
+	draw_coef(x=i, v= (age_pop[1]* sim_exce[,1]+age_pop[2]*sim_exce[,2]+age_pop[3]*sim_exce[,3]+age_pop[4]*sim_exce[,4])/sum(age_pop[1:4]) *1000)
+}
+axis(2, las=2, at=c(-.3,0,.6,.9,.3 ),lwd=0.5)
+mtext(2, text=expression(10^{-3}), cex=0.7,las=2, line=0.5,  padj = -5)
+axis(1, at=1:7, labels = 2:8, padj=-0.8,lwd=0.5, cex=0.7)
+mtext(1, text="begin month", cex=0.7,las=1, line=1)
+mtext(3, text="aggregrated excess mortality\n young population (0-49)", cex=0.7,las=1, line=0)
+box(lwd=0.5,bty='l')
+
+
+
+
+plot(c(0,0),type='n', axes=F,ylab="",xlab="",xaxs='i', xpd=T, 
+		 xlim=c(0.8, 7.2), ylim=c(-0.6,1.1))
+abline(h=c(0), col='gray40', lty=1)
+abline(h=c(-.3,.6,.9,.3 ), col='gray60', lty=2, lwd=0.5)
+for(i in 1:length(sim_exce_list)){
+	sim_exce=sim_exce_list[[i]]
+	draw_coef(x=i, v= (age_pop[5]* sim_exce[,5]+age_pop[6]*sim_exce[,6]+age_pop[7]*sim_exce[,7]+age_pop[8]*sim_exce[,8])/sum(age_pop[5:9]) *1000)
+}
+axis(2, las=2, at=c(-.3,0,.6,.9,.3 ),lwd=0.5)
+mtext(2, text=expression(10^{-3}), cex=0.7,las=2, line=0.5,  padj = -5)
+axis(1, at=1:7, labels = 2:8, padj=-0.8,lwd=0.5, cex=0.7)
+mtext(1, text="begin month", cex=0.7,las=1, line=1)
+mtext(3, text="aggregrated excess mortality\n older adults (50-79)", cex=0.7,las=1, line=0)
+box(lwd=0.5,bty='l')
+
+
+
+plot(c(0,0),type='n', axes=F,ylab="",xlab="",xaxs='i', xpd=T, 
+		 xlim=c(0.8, 7.2), ylim=c(-7,11))
+abline(h=c(0), col='gray40', lty=1)
+abline(h=c(-3,6,9,3 ), col='gray60', lty=2, lwd=0.5)
+for(i in 1:length(sim_exce_list)){
+	sim_exce=sim_exce_list[[i]]
+	draw_coef(x=i, v=  sim_exce[,9]*1000)
+}
+axis(2, las=2, at=c(-3,0,6,9,3 ),lwd=0.5)
+mtext(2, text=expression(10^{-3}), cex=0.7,las=2, line=0.5,  padj = -5)
+axis(1, at=1:7, labels = 2:8, padj=-0.8,lwd=0.5, cex=0.7)
+mtext(1, text="begin month", cex=0.7,las=1, line=1)
+mtext(3, text="aggregrated excess mortality\n older adults (80+)", cex=0.7,las=1, line=0)
+box(lwd=0.5,bty='l')
+
+
+dev.off()
+
+
+
+
+
+
+pdf("~/desktop/excess_prob_dynamic_aggregrate_relative.pdf", width =6.5, height=1.8)
+par(mfrow=c(1,4),oma=c(1,1,1,0), pty='m',mar=c(1,1.5,1,1) ,mgp=c(1.5,0.25,0), lwd=0.5,tck=-0.01, cex.axis=0.7, cex.lab=0.6, cex.main=0.7) 
+plot(c(0,0),type='n', axes=F,ylab="",xlab="",xaxs='i', xpd=T, 
+		 xlim=c(0.8, 7.2), ylim=c(-.6,.6))
+abline(h=c(0), col='gray40', lty=1)
+draw_coef=function(x,v){
+	points(x=x, y=  mean(v), pch=18, col="#8F2727", cex=1.3)
+	lines(x=c(x,x), y= as.vector(   quantile(v, c(0.975, 0.025) )), lwd=1, col="#B97C7C", xpd=T)
+	lines(x=c(x,x), y= as.vector( quantile(v, c(0.75, 0.25) )), lwd=3, col="#8F2727" )
+}
+#abline(h=c(-0.1,0.1, -0.05,-0.15, 0.05), col='gray60', lty=2, lwd=0.5)
+abline(h=c(-.25,.5,.25,-.5 ), col='gray60', lty=2, lwd=0.5)
+for(i in 1:length(sim_exce_list)){
+	sim_exce= sim_exce_list[[i]]
+	sim_base= sim_base_list[[i]]
+	
+	sim_exce_agg=((sim_exce [,1:9] %*% age_pop[1:9])/sum(age_pop[1:9]) /((sim_base [,1:9] %*% age_pop[1:9])/sum(age_pop[1:9]) ))
+	
+	
+	draw_coef(x=i, v=sim_exce_agg)
+}
+axis(2, las=2, at=c(0,.25,.5,-.25,-.5), labels = c(0,"25%", "50%", "-25%", "-50%"),lwd=0.5)
+axis(1, at=1:7, labels = 2:8, padj=-0.8,lwd=0.5, cex=0.7)
+mtext(1, text="begin month", cex=0.7,las=1, line=1)
+mtext(3, text="relative excess mortality  \n all ages", cex=0.7,las=1, line=0)
+box(lwd=0.5,bty='l')
+
+plot(c(0,0),type='n', axes=F,ylab="",xlab="",xaxs='i', xpd=T, 
+		 xlim=c(0.8, 7.2), ylim=c(-0.6,0.6))
+abline(h=c(0), col='gray40', lty=1)
+abline(h=c(-.25,.5,.25,-.5 ), col='gray60', lty=2, lwd=0.5)
+for(i in 1:length(sim_exce_list)){
+	sim_exce= sim_exce_list[[i]]
+	sim_base= sim_base_list[[i]]
+	
+	sim_exce_agg=((sim_exce [,1:5] %*% age_pop[1:5])/sum(age_pop[1:5]) /((sim_base [,1:5] %*% age_pop[1:5])/sum(age_pop[1:5]) ))
+	
+	draw_coef(x=i, v= sim_exce_agg)
+}
+axis(2, las=2, at=c(0,.25,.5,-.25,-.5), labels = c(0,"25%", "50%", "-25%", "-50%"),lwd=0.5)
+axis(1, at=1:7, labels = 2:8, padj=-0.8,lwd=0.5, cex=0.7)
+mtext(1, text="begin month", cex=0.7,las=1, line=1)
+mtext(3, text="relative excess mortality\n young population (0-49)", cex=0.7,las=1, line=0)
+box(lwd=0.5,bty='l')
+
+
+
+
+plot(c(0,0),type='n', axes=F,ylab="",xlab="",xaxs='i', xpd=T, 
+		 xlim=c(0.8, 7.2), ylim=c(-0.6,0.6))
+abline(h=c(0), col='gray40', lty=1)
+abline(h=c(-.25,.5,.25,-.5 ), col='gray60', lty=2, lwd=0.5)
+for(i in 1:length(sim_exce_list)){
+	sim_exce= sim_exce_list[[i]]
+	sim_base= sim_base_list[[i]]
+	
+	sim_exce_agg=((sim_exce [,6:9] %*% age_pop[6:9])/sum(age_pop[6:9]) /((sim_base [,6:9] %*% age_pop[6:9])/sum(age_pop[6:9]) ))
+	
+	draw_coef(x=i, v= sim_exce_agg)
+}
+axis(2, las=2, at=c(0,.25,.5,-.25,-.5), labels = c(0,"25%", "50%", "-25%", "-50%"),lwd=0.5)
+axis(1, at=1:7, labels = 2:8, padj=-0.8,lwd=0.5, cex=0.7)
+mtext(1, text="begin month", cex=0.7,las=1, line=1)
+mtext(3, text="relative excess mortality\n older adults (50-79)", cex=0.7,las=1, line=0)
+box(lwd=0.5,bty='l')
+
+
+
+plot(c(0,0),type='n', axes=F,ylab="",xlab="",xaxs='i', xpd=T, 
+		 xlim=c(0.8, 7.2), ylim=c(-0.6,0.6))
+abline(h=c(0), col='gray40', lty=1)
+abline(h=c(-.25,.5,.25,-.5 ), col='gray60', lty=2, lwd=0.5)
+for(i in 1:length(sim_exce_list)){
+	sim_exce= sim_exce_list[[i]]
+	sim_base= sim_base_list[[i]]
+	
+	sim_exce_agg= sim_exce [,9]  /sim_base [,9] 
+	
+	draw_coef(x=i, v= sim_exce_agg)
+}
+axis(2, las=2, at=c(0,.25,.5,-.25,-.5), labels = c(0,"25%", "50%", "-25%", "-50%"),lwd=0.5)
+axis(1, at=1:7, labels = 2:8, padj=-0.8,lwd=0.5, cex=0.7)
+mtext(1, text="begin month", cex=0.7,las=1, line=1)
+mtext(3, text="relative excess mortality\n older adults (80+)", cex=0.7,las=1, line=0)
+box(lwd=0.5,bty='l')
+
+
+dev.off()
+
+
+
+
