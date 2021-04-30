@@ -8,7 +8,10 @@ TBD
 ### Authors: 
 Prabhat Barnwal*, Yuling Yao* (equal contribution),  Yiqian Wang, Nishat Akter Juy, Shabib Raihan, Mohammad Ashraful Haque,  and Alexander van Geen.
 
+### Survey Data:
+The shared survey data have removed all confidential information and preceise GPS data. Please refer to the codebook for details. 
 
 ###  Licence: 
 - Scripts are under the MIT licence.
 - Data are under the CC BY-NC licence. 
+
