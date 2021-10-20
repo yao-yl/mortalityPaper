@@ -18,7 +18,7 @@ dta <- read.dta13("~/Desktop/listing+round1+round2_indivual_level_data_24042021.
 # duplicate_id=which( dta$dd19_verified_r1==0 |  dta$dd20_verified_r1==0 )
 # cd=dta[-duplicate_id, ]
 # cd=cd[-which(cd$dd20_verified_r2_==0 & is.na(cd$dd20_verified_r1)  ), ]  
-cd=dta[-which(dta$duplicate_rows==1),]
+cd=dta
 
 #cd: the Complete Dataset, only run on survey respondents who gave consent 
 cd=cd[which(cd$survey_done_r1=="Complete"), ] 
